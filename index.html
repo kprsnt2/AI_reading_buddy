@@ -56,7 +56,6 @@
 
     <main class="flex-grow container mx-auto p-4 md:p-8 flex flex-col items-center justify-center">
 
-        <!-- Accent Selection -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-8 w-full max-w-2xl text-center">
             <h3 class="text-xl font-bold text-[#002D62] mb-4">Choose Accent for Audio:</h3>
             <div class="flex justify-center space-x-6">
@@ -124,7 +123,6 @@
             </div>
         </div>
 
-        <!-- Story Starter -->
         <div class="bg-white rounded-lg shadow-xl p-6 md:p-10 w-full max-w-2xl text-center mb-8">
             <h2 class="text-2xl md:text-3xl font-bold text-[#FFD700] mb-6">Let's Create a Story!</h2>
             <p class="text-[#333333] mb-6">Give me a word or a short idea, and I'll start a fun story for you!</p>
@@ -141,7 +139,6 @@
             </div>
         </div>
 
-        <!-- Letter Sound Practice -->
         <div class="bg-white rounded-lg shadow-xl p-6 md:p-10 w-full max-w-2xl text-center">
             <h2 class="text-2xl md:text-3xl font-bold text-[#00A9E0] mb-6">What Sound Does It Make?</h2>
             <p class="text-[#333333] mb-6">Type a letter (like 'm') or a letter group (like 'sh' or 'oa') to learn its sound!</p>
@@ -165,33 +162,32 @@
     </footer>
 
     <script>
-        // Function to call the Gemini API
+        // *** NEW, UPDATED FUNCTION ***
+        // This function calls your secure backend endpoint on Vercel
         async function callGeminiAPI(prompt) {
-            let chatHistory = [];
-            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-            const payload = { contents: chatHistory };
-            const apiKey = ""; // API key will be provided by the Canvas runtime
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch('/api/gemini', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: prompt }),
                 });
+
                 const result = await response.json();
-                if (result.candidates && result.candidates.length > 0 &&
-                    result.candidates[0].content && result.candidates[0].content.parts &&
-                    result.candidates[0].content.parts.length > 0) {
-                    return result.candidates[0].content.parts[0].text;
+
+                if (response.ok) {
+                    return result.text;
                 } else {
-                    return "Oops! My AI brain is a little sleepy. Can you try again?";
+                    console.error("API Error:", result.error);
+                    return `Oops! My AI brain is a little sleepy. Error: ${result.error}`;
                 }
             } catch (error) {
-                console.error("Error calling Gemini API:", error);
+                console.error("Error calling backend:", error);
                 return "Oh no! Something went wrong. Please check your internet connection and try again.";
             }
         }
+
 
         let selectedAccent = 'en-US'; // Default accent
 
@@ -207,20 +203,12 @@
         function speakText(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel(); // Stop any ongoing speech
-
-                // Regex to remove slashes but keep content (e.g., /m/ becomes m, /ai/ becomes ai)
-                // This regex specifically targets content *between* slashes and replaces /.../ with ...
                 const cleanedText = text.replace(/\/(.*?)\//g, '$1'); 
-                
                 const utterance = new SpeechSynthesisUtterance(cleanedText);
-                
-                utterance.lang = selectedAccent; // Set language based on selection
-                utterance.rate = 0.9; // Medium pace
-
-                // Try to find a suitable voice
+                utterance.lang = selectedAccent;
+                utterance.rate = 0.9;
                 const voices = window.speechSynthesis.getVoices();
                 let chosenVoice = null;
-
                 if (selectedAccent === 'en-US') {
                     chosenVoice = voices.find(voice => 
                         voice.lang === 'en-US' && 
@@ -232,11 +220,9 @@
                         (voice.name.includes('Google UK') || voice.name.includes('British English'))
                     );
                 }
-
                 if (chosenVoice) {
                     utterance.voice = chosenVoice;
                 } else {
-                    // Fallback to any voice for the selected language if a specific one isn't found
                     const fallbackVoice = voices.find(voice => voice.lang === selectedAccent);
                     if (fallbackVoice) {
                         utterance.voice = fallbackVoice;
@@ -244,7 +230,6 @@
                         console.warn(`No specific voice found for ${selectedAccent}, using default.`);
                     }
                 }
-                
                 window.speechSynthesis.speak(utterance);
             } else {
                 alert("Sorry, your browser doesn't support text-to-speech!");
@@ -255,21 +240,15 @@
         function updateOutputDiv(outputDiv, responseText, loadingSpinner) {
             outputDiv.innerHTML = ''; // Clear previous content
             loadingSpinner.style.display = 'none';
-
-            // Add the text response
             const textParagraph = document.createElement('p');
             textParagraph.textContent = responseText;
             outputDiv.appendChild(textParagraph);
-
-            // Add the audio play button
             const audioButton = document.createElement('button');
             audioButton.className = 'audio-btn';
             audioButton.innerHTML = '🔊 Play Audio';
-            // Pass the original responseText to speakText, which will then clean it
             audioButton.onclick = () => speakText(responseText); 
             outputDiv.appendChild(audioButton);
         }
-
 
         // Blending Section
         const wordInput = document.getElementById('wordInput');
@@ -283,12 +262,9 @@
                 aiResponseDiv.innerHTML = '<p class="text-red-500 font-bold">Please type a word or some sounds first!</p>';
                 return;
             }
-
             aiResponseDiv.innerHTML = '';
             loadingSpinner.style.display = 'block';
-
             let prompt = "";
-
             if (inputVal.includes(' ')) {
                 const sounds = inputVal.split(' ').filter(s => s.length > 0);
                 if (sounds.length === 0) {
@@ -300,7 +276,6 @@
             } else {
                 prompt = `Act as a friendly phonics teacher for a 1st grader. A child has entered the word: '${inputVal}'. Break this word down into its sounds and explain step-by-step how to blend those sounds to read the word. Use very simple language, short sentences, and encourage them. Keep it concise, around 50-70 words.`;
             }
-
             const responseText = await callGeminiAPI(prompt);
             updateOutputDiv(aiResponseDiv, responseText, loadingSpinner);
         });
@@ -317,10 +292,8 @@
                 rhymeOutputDiv.innerHTML = '<p class="text-red-500 font-bold">Please type a word for rhyming!</p>';
                 return;
             }
-
             rhymeOutputDiv.innerHTML = '';
             rhymeLoadingSpinner.style.display = 'block';
-
             const prompt = `Act as a friendly primary school teacher. Give 3-5 simple words that rhyme with '${inputVal}'. Explain what rhyming means in very simple terms for a 1st grader and encourage them. Keep it concise, around 50-70 words.`;
             const responseText = await callGeminiAPI(prompt);
             updateOutputDiv(rhymeOutputDiv, responseText, rhymeLoadingSpinner);
@@ -328,7 +301,7 @@
 
         // Sentence Builder Section
         const sentenceWordInput = document.getElementById('sentenceWordInput');
-        const getSentenceBtn = document = document.getElementById('getSentenceBtn');
+        const getSentenceBtn = document.getElementById('getSentenceBtn');
         const sentenceOutputDiv = document.getElementById('sentenceOutput');
         const sentenceLoadingSpinner = document.getElementById('sentenceLoading');
 
@@ -338,10 +311,8 @@
                 sentenceOutputDiv.innerHTML = '<p class="text-red-500 font-bold">Please type a word for the sentence!</p>';
                 return;
             }
-
             sentenceOutputDiv.innerHTML = '';
             sentenceLoadingSpinner.style.display = 'block';
-
             const prompt = `Act as a friendly primary school teacher. Create one very simple, short sentence (5-8 words) using the word '${inputVal}'. Explain the sentence briefly to a 1st grader and encourage them. Keep it concise, around 50-70 words.`;
             const responseText = await callGeminiAPI(prompt);
             updateOutputDiv(sentenceOutputDiv, responseText, sentenceLoadingSpinner);
@@ -359,10 +330,8 @@
                 storyOutputDiv.innerHTML = '<p class="text-red-500 font-bold">Please type a word or idea for the story!</p>';
                 return;
             }
-
             storyOutputDiv.innerHTML = '';
             storyLoadingSpinner.style.display = 'block';
-
             const prompt = `Act as a friendly primary school teacher. Write a very simple story starter (2-3 sentences, 20-30 words) for a 1st grader using the phrase/word: '${inputVal}'. Make it imaginative and encouraging for them to continue.`;
             const responseText = await callGeminiAPI(prompt);
             updateOutputDiv(storyOutputDiv, responseText, storyLoadingSpinner);
@@ -380,10 +349,8 @@
                 letterSoundOutputDiv.innerHTML = '<p class="text-red-500 font-bold">Please type a letter or letter group!</p>';
                 return;
             }
-
             letterSoundOutputDiv.innerHTML = '';
             letterSoundLoadingSpinner.style.display = 'block';
-
             const prompt = `Act as a friendly primary school teacher. Explain the sound(s) the letter(s) '${inputVal}' make to a 1st grader. Give one very simple example word that uses this sound. Keep it concise, around 30-50 words, and encouraging.`;
             const responseText = await callGeminiAPI(prompt);
             updateOutputDiv(letterSoundOutputDiv, responseText, letterSoundLoadingSpinner);
